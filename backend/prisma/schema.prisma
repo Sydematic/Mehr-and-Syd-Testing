@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Profile {
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  username String  @unique
+  email    String? @unique
+
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  playlists Playlist[]
+  ratings   Rating[]
+  watchlist Watchlist[]
+}
+
+/// Unified model for both Movies and TV Shows
+model Media {
+  tmdbId        Int             @id
+  title         String
+  type          MediaType       @default(MOVIE)
+  genres        Genre[]
+  description   String?
+  posterUrl     String?
+  producer      String?
+  releaseYear   Int?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  episodes      Episode[]
+  playlistMedia PlaylistMedia[]
+  ratings       Rating[]
+  watchlist     Watchlist[]
+}
+
+/// Episodes reference a Media item by TMDB ID (only used for TV series)
+model Episode {
+  mediaTmdbId   Int
+  seasonNumber  Int
+  episodeNumber Int
+  name          String
+  airDate       DateTime?
+  createdAt     DateTime  @default(now())
+
+  media Media @relation(fields: [mediaTmdbId], references: [tmdbId], onDelete: Cascade)
+
+  @@id([mediaTmdbId, seasonNumber, episodeNumber])
+}
+
+/// Ratings link users to media
+model Rating {
+  profileId   String
+  mediaTmdbId Int
+  rating      Int
+  review      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [userId], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaTmdbId], references: [tmdbId], onDelete: Cascade)
+
+  @@id([profileId, mediaTmdbId])
+}
+
+/// Each watchlist entry links one user ↔ one media item
+model Watchlist {
+  profileId   String
+  mediaTmdbId Int
+  status      WatchStatus @default(PLANNED)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [userId], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaTmdbId], references: [tmdbId], onDelete: Cascade)
+
+  @@id([profileId, mediaTmdbId])
+}
+
+/// Playlist belongs to a single profile
+model Playlist {
+  id            Int      @id @default(autoincrement())
+  profileId     String
+  name          String
+  ownerUsername String
+  isPublic      Boolean  @default(true)
+  isFavorite    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  profile       Profile         @relation(fields: [profileId], references: [userId], onDelete: Cascade)
+  playlistMedia PlaylistMedia[]
+
+  @@unique([name, profileId])
+}
+
+/// PlaylistMedia connects playlists with TV series and Movies
+model PlaylistMedia {
+  playlistName String
+  profileId    String
+  mediaTmdbId  Int
+  playlist     Playlist @relation(fields: [playlistName, profileId], references: [name, profileId], onDelete: Cascade)
+  media        Media    @relation(fields: [mediaTmdbId], references: [tmdbId], onDelete: Cascade)
+
+  @@id([playlistName, profileId, mediaTmdbId])
+}
+
+/// Enums
+enum MediaType {
+  MOVIE
+  TV
+}
+
+enum WatchStatus {
+  WATCHING
+  COMPLETED
+  PLANNED
+  DROPPED
+  REMOVED
+}
+
+enum Genre {
+  ACTION
+  COMEDY
+  DRAMA
+  FANTASY
+  HORROR
+  ROMANCE
+  SCIFI
+  THRILLER
+  ANIMATION
+}

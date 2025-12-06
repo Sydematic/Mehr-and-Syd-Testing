@@ -1,0 +1,110 @@
+import React, { useEffect, useState } from "react";
+import ShowCard from "./ShowCard";
+
+const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const TRENDING_URL = `https://api.themoviedb.org/3/trending/tv/week?api_key=${API_KEY}`;
+
+export default function TrendingShows() {
+  const [shows, setShows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const ITEMS_PER_PAGE = 5; // number of shows visible at a time
+
+  useEffect(() => {
+    const fetchTrending = async () => {
+      try {
+        console.log("TMDB API KEY:", API_KEY); // verify key is loaded
+
+        const res = await fetch(TRENDING_URL);
+        const data = await res.json();
+
+        if (!res.ok) {
+          console.error("TMDB fetch error:", data);
+          throw new Error(data.status_message || "Failed to fetch trending shows");
+        }
+
+        setShows(data.results || []);
+      } catch (err) {
+        console.error("Error fetching trending shows:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrending();
+  }, []);
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => Math.max(prev - ITEMS_PER_PAGE, 0));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) =>
+      Math.min(prev + ITEMS_PER_PAGE, shows.length - ITEMS_PER_PAGE)
+    );
+  };
+
+  if (loading) {
+    return <div className="text-white text-center mt-10">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500 text-center mt-10">{error}</div>;
+  }
+
+  return (
+    <div className="py-20">
+      {/* Title */}
+      <div className="w-full max-w-6xl mx-auto text-center">
+        <h2 className="text-2xl md:text-3xl mb-4 font-semibold text-gray-200">
+          Trending Shows
+        </h2>
+        <div className="h-[2px] bg-white/30 w-3/4 mx-auto mt-2 mb-10"></div>
+      </div>
+
+      {/* Carousel */}
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-center gap-6">
+        {/* Left Arrow */}
+        <button
+          className="transform rotate-180 p-3 rounded-full text-white hover:text-secondary disabled:opacity-40"
+          onClick={handlePrev}
+          disabled={currentIndex === 0}
+        >
+          ➤
+        </button>
+
+        {/* Show Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {shows
+            .slice(currentIndex, currentIndex + ITEMS_PER_PAGE)
+            .map((show) => (
+              <div
+                key={show.id}
+                className="flex-shrink-0 w-40 sm:w-44 h-[20rem] mx-auto"
+              >
+                <ShowCard
+                  show={{
+                    ...show,
+                    poster_path: show.poster_path || "/placeholder.png",
+                  }}
+                />
+              </div>
+            ))}
+        </div>
+
+        {/* Right Arrow */}
+        <button
+          className="p-3 rounded-full text-white hover:text-secondary disabled:opacity-40"
+          onClick={handleNext}
+          disabled={currentIndex >= shows.length - ITEMS_PER_PAGE}
+        >
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+}
+
