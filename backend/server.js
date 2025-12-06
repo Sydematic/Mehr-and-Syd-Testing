@@ -11,30 +11,72 @@ import reviewRouter from "./routes/review.js";
 const app = express();
 app.use(express.json());
 
-// Enable CORS for frontend
-app.use(cors({
-  origin: "http://localhost:5173",
-}));
+// =========================================
+// CORS CONFIG — ALLOWS LOCAL + NETLIFY + MOBILE
+// =========================================
+const allowedOrigins = [
+  "http://localhost:5173",               // Vite local dev
+  "http://localhost:3000",               // Optional local dev
+  process.env.FRONTEND_URL,              // Netlify (Render env variable)
+  "https://sceneit1111.netlify.app",     // Hard-coded fallback
+];
 
-// Basic health check
-app.get("/", (_req, res) => res.send('Backend server ran successfully!'));
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (curl, mobile app, internal calls)
+      if (!origin) return callback(null, true);
 
-// Protected ping test
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.warn("🚫 BLOCKED BY CORS:", origin);
+        return callback(new Error("CORS not allowed from: " + origin), false);
+      }
+    },
+    credentials: true,
+  })
+);
+
+// =========================================
+// HEALTH CHECKS
+// =========================================
+app.get("/", (_req, res) =>
+  res.send('Backend server ran successfully!')
+);
+
+app.get("/health", (_req, res) =>
+  res.json({ ok: true })
+);
+
+// =========================================
+// PROTECTED TEST ROUTE
+// =========================================
 app.get("/private/ping", verifyToken, (req, res) => {
-  res.json({ ok: true, user: req.user ?? null });
+  res.json({
+    ok: true,
+    user: req.user ?? null,
+  });
 });
 
-// Routes
+// =========================================
+// API ROUTES
+// =========================================
 app.use("/shows", verifyToken, showRouter);
-app.use("/playlists", playlistsRouter);  // optional: add verifyToken if needed
+app.use("/playlists", playlistsRouter);
 app.use("/ratings", ratingsRouter);
 
-// User routes (playlists, favorites, reviews)
+// User routes
 app.use("/api/users", usersRouter);
 
-// Reviews routes by show or user
+// Reviews routes
 app.use("/api/reviews", reviewRouter);
 
+// =========================================
+// START SERVER
+// =========================================
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`"SceneIt" server running on http://localhost:${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`"SceneIt" server running on port ${PORT}`);
+});
