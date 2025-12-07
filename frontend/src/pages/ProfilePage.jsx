@@ -23,14 +23,12 @@ const ProfilePage = () => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  // EDIT PROFILE STATE
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     username: "",
     about: "",
   });
 
-  // Fetch profile & related data
   useEffect(() => {
     const controller = new AbortController();
 
@@ -47,7 +45,6 @@ const ProfilePage = () => {
 
         const userIdToFetch = id || user.id;
 
-        // Fetch Supabase profile
         const { data: userProfile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
@@ -69,7 +66,6 @@ const ProfilePage = () => {
           wantToWatch: userProfile.want_to_watch || 0,
         });
 
-        // Fetch watched, listed, reviews
         const [watchedRes, listedRes, reviewsRes] = await Promise.all([
           supabase
             .from("user_shows")
@@ -103,7 +99,6 @@ const ProfilePage = () => {
     return () => controller.abort();
   }, [id, user]);
 
-  // Upload profile picture
   const handleProfileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !user) return;
@@ -154,7 +149,6 @@ const ProfilePage = () => {
     }
   };
 
-  // SAVE EDITED PROFILE
   const handleSaveProfile = async () => {
     if (!user) return;
 
@@ -178,7 +172,6 @@ const ProfilePage = () => {
     }));
 
     setIsEditing(false);
-    alert("Profile updated!");
   };
 
   if (loading) return <p className="text-white p-6">Loading...</p>;
@@ -192,8 +185,11 @@ const ProfilePage = () => {
           </div>
         )}
 
-        {/* Top User Section */}
+        {/* ------------------------ */}
+        {/* TOP SECTION WITH RIGHT-ALIGNED EDIT BUTTON */}
+        {/* ------------------------ */}
         <div className="flex items-start gap-10">
+          {/* PROFILE IMAGE + UPLOAD */}
           <div className="flex flex-col items-center">
             <div className="relative">
               <img
@@ -208,7 +204,6 @@ const ProfilePage = () => {
               )}
             </div>
 
-            {/* Upload Button */}
             {(!id || id === user?.id) && (
               <label
                 className={`mt-4 bg-[#FCA311] px-4 py-2 rounded text-black font-semibold cursor-pointer hover:bg-opacity-90 transition-all ${
@@ -227,26 +222,30 @@ const ProfilePage = () => {
             )}
           </div>
 
+          {/* USERNAME + BUTTON ON FAR RIGHT */}
           <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-4">{userInfo.username}</h1>
+            <div className="flex justify-between items-center w-full">
+              <h1 className="text-3xl font-bold">{userInfo.username}</h1>
 
-            {/* EDIT PROFILE BUTTON */}
-            {(!id || id === user?.id) && (
-              <button
-                onClick={() => {
-                  setEditForm({
-                    username: userInfo.username,
-                    about: userInfo.about,
-                  });
-                  setIsEditing(true);
-                }}
-                className="bg-[#FCA311] px-4 py-2 rounded text-black font-semibold mb-4"
-              >
-                Edit Profile
-              </button>
-            )}
+              {(!id || id === user?.id) && (
+                <button
+                  onClick={() => {
+                    setEditForm({
+                      username: userInfo.username,
+                      about: userInfo.about,
+                    });
+                    setIsEditing(true);
+                  }}
+                  className="bg-[#FCA311] px-4 py-2 rounded text-black font-semibold"
+                >
+                  Edit Profile
+                </button>
+              )}
+            </div>
 
-            <p className="text-lg font-semibold tracking-wide">ABOUT ME:</p>
+            <p className="text-lg font-semibold tracking-wide mt-4">
+              ABOUT ME:
+            </p>
             <p className="mt-2 max-w-xl leading-relaxed">
               {userInfo.about || "No bio yet."}
             </p>
@@ -259,17 +258,18 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Watched Shows Section */}
+        {/* WATCHED */}
         <Section title="WATCHED SHOWS" items={watchedShows} />
 
-        {/* Want to Watch Section */}
+        {/* WANT TO WATCH */}
         <Section title="WANT TO WATCH" items={listedShows} />
 
-        {/* Reviews Section */}
+        {/* REVIEWS */}
         <div className="mt-16">
           <h2 className="text-lg font-semibold border-b border-gray-500 pb-1 tracking-wide">
             SHOWS I RECENTLY RATED
           </h2>
+
           {reviews.length === 0 ? (
             <p className="mt-4 text-gray-300">No reviews yet.</p>
           ) : (
@@ -284,7 +284,6 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* EDIT PROFILE MODAL */}
       <EditProfileModal
         isOpen={isEditing}
         onClose={() => setIsEditing(false)}
@@ -298,9 +297,7 @@ const ProfilePage = () => {
 
 export default ProfilePage;
 
-/* =======================
-   STATS COMPONENT
-======================= */
+/* STATS */
 const Stat = ({ number, label }) => (
   <div>
     <p className="text-2xl font-bold">{number}</p>
@@ -308,9 +305,7 @@ const Stat = ({ number, label }) => (
   </div>
 );
 
-/* =======================
-   SECTION (SHOWS GRID)
-======================= */
+/* SHOW GRID */
 const Section = ({ title, items = [] }) => (
   <div className="mt-16">
     <h2 className="text-lg font-semibold tracking-wide border-b border-gray-500 pb-1 w-full">
@@ -340,9 +335,7 @@ const Section = ({ title, items = [] }) => (
   </div>
 );
 
-/* =======================
-   EDIT PROFILE MODAL
-======================= */
+/* EDIT MODAL */
 const EditProfileModal = ({
   isOpen,
   onClose,
