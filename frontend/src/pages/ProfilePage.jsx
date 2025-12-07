@@ -15,6 +15,7 @@ const ProfilePage = () => {
     wantToWatch: 0,
     profileImageUrl: null,
   });
+
   const [watchedShows, setWatchedShows] = useState([]);
   const [listedShows, setListedShows] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -22,10 +23,16 @@ const ProfilePage = () => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [uploading, setUploading] = useState(false);
 
+  // EDIT PROFILE STATE
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    username: "",
+    about: "",
+  });
+
   // Fetch profile & related data
   useEffect(() => {
     const controller = new AbortController();
-    const signal = controller.signal;
 
     const fetchProfile = async () => {
       setLoading(true);
@@ -62,7 +69,7 @@ const ProfilePage = () => {
           wantToWatch: userProfile.want_to_watch || 0,
         });
 
-        // Fetch watched shows, listed shows, and reviews
+        // Fetch watched, listed, reviews
         const [watchedRes, listedRes, reviewsRes] = await Promise.all([
           supabase
             .from("user_shows")
@@ -101,15 +108,13 @@ const ProfilePage = () => {
     const file = e.target.files[0];
     if (!file || !user) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      alert("Image must be less than 5MB");
       return;
     }
 
@@ -119,41 +124,61 @@ const ProfilePage = () => {
       const fileExt = file.name.split(".").pop();
       const filePath = `avatars/${user.id}.${fileExt}`;
 
-      // Upload with upsert to replace existing file
       const { error: uploadError } = await supabase.storage
         .from("profile-pictures")
-        .upload(filePath, file, { 
-          upsert: true,
-          cacheControl: '0' // Prevent caching issues
-        });
-      
+        .upload(filePath, file, { upsert: true });
+
       if (uploadError) throw uploadError;
 
-      // Get public URL with cache-busting timestamp
       const { data } = supabase.storage
         .from("profile-pictures")
         .getPublicUrl(filePath);
 
-      const imageUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+      const imageUrl = `${data.publicUrl}?t=${Date.now()}`;
 
-      // Update database
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ profile_image_url: imageUrl })
         .eq("id", user.id);
-      
+
       if (updateError) throw updateError;
 
       setUserInfo((prev) => ({ ...prev, profileImageUrl: imageUrl }));
-      alert('Profile picture updated successfully!');
+      alert("Profile picture updated!");
     } catch (err) {
       console.error("Profile upload error:", err);
-      alert("Image upload failed. Please try again.");
+      alert("Image upload failed. Try again.");
     } finally {
       setUploading(false);
-      // Reset the input so the same file can be selected again if needed
-      e.target.value = '';
+      e.target.value = "";
     }
+  };
+
+  // SAVE EDITED PROFILE
+  const handleSaveProfile = async () => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        username: editForm.username,
+        about: editForm.about,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      alert("Failed to update profile.");
+      return;
+    }
+
+    setUserInfo((prev) => ({
+      ...prev,
+      username: editForm.username,
+      about: editForm.about,
+    }));
+
+    setIsEditing(false);
+    alert("Profile updated!");
   };
 
   if (loading) return <p className="text-white p-6">Loading...</p>;
@@ -182,10 +207,15 @@ const ProfilePage = () => {
                 </div>
               )}
             </div>
-            
+
+            {/* Upload Button */}
             {(!id || id === user?.id) && (
-              <label className={`mt-4 bg-[#FCA311] px-4 py-2 rounded text-black font-semibold cursor-pointer hover:bg-opacity-90 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                {userInfo.profileImageUrl ? 'Change Image' : 'Upload Image'}
+              <label
+                className={`mt-4 bg-[#FCA311] px-4 py-2 rounded text-black font-semibold cursor-pointer hover:bg-opacity-90 transition-all ${
+                  uploading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {userInfo.profileImageUrl ? "Change Image" : "Upload Image"}
                 <input
                   type="file"
                   accept="image/*"
@@ -199,8 +229,28 @@ const ProfilePage = () => {
 
           <div className="flex-1">
             <h1 className="text-3xl font-bold mb-4">{userInfo.username}</h1>
+
+            {/* EDIT PROFILE BUTTON */}
+            {(!id || id === user?.id) && (
+              <button
+                onClick={() => {
+                  setEditForm({
+                    username: userInfo.username,
+                    about: userInfo.about,
+                  });
+                  setIsEditing(true);
+                }}
+                className="bg-[#FCA311] px-4 py-2 rounded text-black font-semibold mb-4"
+              >
+                Edit Profile
+              </button>
+            )}
+
             <p className="text-lg font-semibold tracking-wide">ABOUT ME:</p>
-            <p className="mt-2 max-w-xl leading-relaxed">{userInfo.about || "No bio yet."}</p>
+            <p className="mt-2 max-w-xl leading-relaxed">
+              {userInfo.about || "No bio yet."}
+            </p>
+
             <div className="flex gap-12 mt-6">
               <Stat number={userInfo.watched} label="Watched" />
               <Stat number={userInfo.rated} label="Rated" />
@@ -211,7 +261,7 @@ const ProfilePage = () => {
 
         {/* Watched Shows Section */}
         <Section title="WATCHED SHOWS" items={watchedShows} />
-        
+
         {/* Want to Watch Section */}
         <Section title="WANT TO WATCH" items={listedShows} />
 
@@ -233,13 +283,24 @@ const ProfilePage = () => {
           )}
         </div>
       </div>
+
+      {/* EDIT PROFILE MODAL */}
+      <EditProfileModal
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        onSave={handleSaveProfile}
+      />
     </div>
   );
 };
 
 export default ProfilePage;
 
-// STATS COMPONENT
+/* =======================
+   STATS COMPONENT
+======================= */
 const Stat = ({ number, label }) => (
   <div>
     <p className="text-2xl font-bold">{number}</p>
@@ -247,18 +308,19 @@ const Stat = ({ number, label }) => (
   </div>
 );
 
-// SECTION COMPONENT
+/* =======================
+   SECTION (SHOWS GRID)
+======================= */
 const Section = ({ title, items = [] }) => (
   <div className="mt-16">
-    <div className="flex justify-between items-center mb-6">
-      <h2 className="text-lg font-semibold tracking-wide border-b border-gray-500 pb-1 w-full">
-        {title}
-      </h2>
-    </div>
+    <h2 className="text-lg font-semibold tracking-wide border-b border-gray-500 pb-1 w-full">
+      {title}
+    </h2>
+
     {items.length === 0 ? (
-      <p className="text-gray-300">No items found.</p>
+      <p className="text-gray-300 mt-4">No items found.</p>
     ) : (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 mt-6">
         {items.map((item) => (
           <div key={item.id} className="text-center">
             <img
@@ -277,3 +339,59 @@ const Section = ({ title, items = [] }) => (
     )}
   </div>
 );
+
+/* =======================
+   EDIT PROFILE MODAL
+======================= */
+const EditProfileModal = ({
+  isOpen,
+  onClose,
+  editForm,
+  setEditForm,
+  onSave,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-6 z-50">
+      <div className="bg-white text-black p-6 rounded-lg w-full max-w-lg">
+        <h2 className="text-xl font-bold mb-4">Edit Profile</h2>
+
+        <label className="font-semibold">Username</label>
+        <input
+          type="text"
+          value={editForm.username}
+          onChange={(e) =>
+            setEditForm({ ...editForm, username: e.target.value })
+          }
+          className="w-full border p-2 rounded mb-4"
+        />
+
+        <label className="font-semibold">About Me</label>
+        <textarea
+          value={editForm.about}
+          onChange={(e) =>
+            setEditForm({ ...editForm, about: e.target.value })
+          }
+          className="w-full border p-2 rounded h-32 mb-4"
+        />
+
+        <div className="flex justify-end gap-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-400 rounded text-black"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={onSave}
+            className="px-4 py-2 bg-[#FCA311] rounded text-black font-semibold"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

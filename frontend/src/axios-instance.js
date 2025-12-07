@@ -1,9 +1,7 @@
 import axios from "axios";
 import supabase from "./client";
-import { useNavigate } from "react-router-dom";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,13 +10,9 @@ const api = axios.create({
   },
 });
 
-const navigate = useNavigate();
-
-
-/// attached Supabase access_token to every request automatically
+// Attach Supabase access_token to every request
 api.interceptors.request.use(
   async (config) => {
-    /// gets the current session from Supabase (auto-refreshes)
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -32,20 +26,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-
-/// log user out and redirect them to AuthPage '/auth' if 
+// Handle 401 unauthorized — log out + redirect
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      /// clears the Supabase session
       await supabase.auth.signOut();
-
-      /// redirects user
-      navigate('/auth');
+      window.location.href = "/auth"; // <-- IMPORTANT
     }
     return Promise.reject(error);
   }
 );
 
 export default api;
+
